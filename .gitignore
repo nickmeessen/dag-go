@@ -1,0 +1,25 @@
+# Go build artifacts
+*.test
+*.out
+/bin/
+/dist/
+
+# Coverage
+coverage.*
+
+# Vendor
+/vendor/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
