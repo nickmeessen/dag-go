@@ -20,4 +20,9 @@ var (
 	// transport layer (DNS, TCP, TLS, timeout). Callers should treat this
 	// as a retryable condition.
 	ErrNodeUnreachable = errors.New("node unreachable")
+
+	// ErrTxRejected is returned when L1 rejects a submitted transaction with a
+	// 4xx status — typically malformed input, insufficient balance, bad parent
+	// reference, or duplicate hash.
+	ErrTxRejected = errors.New("transaction rejected")
 )
