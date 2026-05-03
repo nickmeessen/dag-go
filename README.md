@@ -1,7 +1,9 @@
 # dag-go 
 
+[![CI](https://github.com/nickmeessen/dag-go/actions/workflows/ci.yml/badge.svg)](https://github.com/nickmeessen/dag-go/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nickmeessen/dag-go.svg)](https://pkg.go.dev/github.com/nickmeessen/dag-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nickmeessen/dag-go)](https://goreportcard.com/report/github.com/nickmeessen/dag-go)
+[![Release](https://img.shields.io/github/v/release/nickmeessen/dag-go)](https://github.com/nickmeessen/dag-go/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
 A Go SDK for interacting with the Constellation DAG network, mostly ported from the JavaScript SDK https://github.com/StardustCollective/dag4.js

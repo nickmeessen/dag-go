@@ -23,6 +23,11 @@ func (s *WalletTestSuite) TestNew() {
 		s.NotEmpty(wallet.Address())
 		s.NotEmpty(wallet.PeerID())
 	})
+
+	s.Run("Fails with invalid private key", func() {
+		_, err := FromPrivateKey("invalid")
+		s.Error(err)
+	})
 }
 
 func (s *WalletTestSuite) TestFromPrivateKey() {
@@ -38,6 +43,21 @@ func (s *WalletTestSuite) TestFromPrivateKey() {
 		s.NotNil(wallet)
 		s.Equal("DAG58AYZbPHyiYQcmD96T3zWK2HyN3Zc3cjWGqi7", wallet.Address())
 		s.Equal("648e3c3c885e8c8077fcc3dc4b1990bae2c30562aded1fdc1c689ef7c9adbaee709cd9a1f7a914268f768b310dde7f0cedc2e2c39ffafa31f56819cb8435ba98", wallet.PeerID())
+	})
+
+	s.Run("Fails with invalid private key", func() {
+		_, err := FromPrivateKey("invalid")
+		s.Error(err)
+	})
+
+	s.Run("Fails with too short private key", func() {
+		_, err := FromPrivateKey("123")
+		s.Error(err)
+	})
+
+	s.Run("Fails with zero scalar", func() {
+		_, err := FromPrivateKey("0000000000000000000000000000000000000000000000000000000000000000")
+		s.ErrorIs(err, ErrInvalidPrivateKey)
 	})
 }
 
@@ -94,4 +114,11 @@ func (s *WalletTestSuite) TestSign() {
 		s.Require().NoError(err)
 		s.NotZero(signed.Value.Salt, "Sign should populate zero-salt transfers")
 	})
+}
+
+func (s *WalletTestSuite) TestPrivateKeyHex() {
+	w, err := FromPrivateKey("9bfe101efc5458ce1dfb8d56c91ad38effb6974d371b6ad206e484e49ed7013c")
+	s.Require().NoError(err)
+
+	s.Equal("9bfe101efc5458ce1dfb8d56c91ad38effb6974d371b6ad206e484e49ed7013c", w.PrivateKeyHex())
 }

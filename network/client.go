@@ -67,7 +67,7 @@ func WithIntegrationNet() Option {
 	}
 }
 
-func (c *Client) doJSON(ctx context.Context, op, url string, method string, body any, out any) error {
+func (c *Client) doJSON(ctx context.Context, op, url, method string, body, out any) error {
 	var bodyReader io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -90,6 +90,9 @@ func (c *Client) doJSON(ctx context.Context, op, url string, method string, body
 
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotFound
+	}
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		return fmt.Errorf("%w: %s returned %d", ErrTxRejected, op, resp.StatusCode)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s: unexpected status %d", op, resp.StatusCode)
@@ -144,7 +147,7 @@ func (c *Client) LastTxRef(ctx context.Context, address string) (tx.Ref, error) 
 // Send submits a signed transaction to L1's transaction pool and returns the
 // assigned transaction hash on success. Returns ErrNodeUnreachable on
 // transport-level failures.
-func (c *Client) Send(ctx context.Context, signed tx.Signed) (hash string, err error) {
+func (c *Client) Send(ctx context.Context, signed tx.Signed) (string, error) {
 	var r struct {
 		Hash string `json:"hash"`
 	}

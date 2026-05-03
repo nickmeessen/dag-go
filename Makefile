@@ -11,7 +11,7 @@ test-race:
 	go test -race ./...
 
 cover: 
-	go test -coverprofile=coverage.out ./...
+	go test -coverprofile=coverage.out $$(go list ./... | grep -v /examples)
 	go tool cover -html=coverage.out -o coverage.html
 
 lint: 
