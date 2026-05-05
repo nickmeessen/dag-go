@@ -16,6 +16,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/mr-tron/base58"
 	"github.com/nickmeessen/dag-go/tx"
+	"github.com/tyler-smith/go-bip32"
+	"github.com/tyler-smith/go-bip39"
 )
 
 // pkcsPrefix is the 23-byte DER-encoded SubjectPublicKeyInfo header for
@@ -57,6 +59,32 @@ func FromPrivateKey(privateKey string) (*Wallet, error) {
 	}
 
 	return &Wallet{privateKey: priv}, nil
+}
+
+// FromMnemonic restores a Wallet from a BIP39 mnemonic phrase using the
+// Constellation HD derivation path m/44'/1137'/0'/0/0.
+// Returns ErrInvalidMnemonic if the phrase fails BIP39 validation (word count,
+// unknown word, or checksum mismatch).
+func FromMnemonic(phrase string) (*Wallet, error) {
+	if !bip39.IsMnemonicValid(phrase) {
+		return nil, ErrInvalidMnemonic
+	}
+
+	master, err := bip32.NewMasterKey(bip39.NewSeed(phrase, ""))
+	if err != nil {
+		return nil, fmt.Errorf("derive master key: %w", err)
+	}
+
+	const hardened = uint32(0x80000000)
+	key := master
+	for _, idx := range []uint32{44 | hardened, 1137 | hardened, 0 | hardened, 0, 0} {
+		key, err = key.NewChildKey(idx)
+		if err != nil {
+			return nil, fmt.Errorf("derive child key: %w", err)
+		}
+	}
+
+	return FromPrivateKey(hex.EncodeToString(key.Key))
 }
 
 // PrivateKeyHex returns the 32-byte private key as 64 hex characters.
