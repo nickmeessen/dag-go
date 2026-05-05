@@ -48,7 +48,7 @@ go get github.com/nickmeessen/dag-go
 Early v0.1 — verified end-to-end on IntegrationNet (snapshot ordinal 5433835).
 
 **Works:**
-- secp256k1 wallet generation and import from hex private key
+- secp256k1 wallet generation and import from hex private key or BIP39 mnemonic
 - DAG address & PeerID derivation
 - Balance and last-tx-ref queries
 - Signing transfers (byte-for-byte cross-validated against dag4.js v2.8.1)
