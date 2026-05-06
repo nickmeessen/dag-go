@@ -43,23 +43,6 @@ See [`examples/basic`](examples/basic/main.go) for the full demo including pendi
 go get github.com/nickmeessen/dag-go
 ```
 
-## Status
-
-Early v0.1 — verified end-to-end on IntegrationNet (snapshot ordinal 5433835).
-
-**Works:**
-- secp256k1 wallet generation and import from hex private key or BIP39 mnemonic
-- DAG address & PeerID derivation
-- Balance and last-tx-ref queries
-- Signing transfers (byte-for-byte cross-validated against dag4.js v2.8.1)
-- Submitting signed transfers to L1 and polling for confirmation
-
-**Not yet:**
-- Metagraph / currency tokens
-- Batch transfers
-- Block Explorer queries (confirmed-tx lookup, history)
-- Retry / backoff / multi-node failover
-
 ## Disclaimer
 
 This is an unofficial third-party SDK. Not affiliated with or endorsed by
