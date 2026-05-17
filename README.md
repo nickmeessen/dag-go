@@ -37,6 +37,8 @@ fmt.Printf("submitted: %s (balance was %s)\n", hash, bal)
 
 See [`examples/basic`](examples/basic/main.go) for the full demo including pending-tx polling.
 
+For metagraph token transfers, use `network.NewMetagraphClient` with the metagraph's L0/L1 URLs, see [`examples/metagraph`](examples/metagraph/main.go).
+
 ## Installation
 
 ```bash
