@@ -6,11 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-errors/errors"
 	"github.com/nickmeessen/dag-go/tx"
+	"github.com/nickmeessen/dag-go/wallet"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -23,18 +25,42 @@ func TestClientTestSuite(t *testing.T) {
 }
 
 func (s *ClientTestSuite) TestNew() {
-	s.Run("creates client for mainnet", func() {
-		c, err := New(WithMainNet())
+	s.Run("routes balance call to mainnet L0", func() {
+		w, err := wallet.New()
 		s.Require().NoError(err)
-		s.Equal("https://l0-lb-mainnet.constellationnetwork.io", c.l0URL)
-		s.Equal("https://l1-lb-mainnet.constellationnetwork.io", c.l1URL)
+
+		var capturedURL string
+		rt := transportFunc(func(r *http.Request) (*http.Response, error) {
+			capturedURL = r.URL.String()
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"balance":0,"ordinal":0}`)),
+			}, nil
+		})
+		c, err := New(WithMainNet(), WithHTTPClient(&http.Client{Transport: rt}))
+		s.Require().NoError(err)
+
+		_, _ = c.Balance(context.Background(), w.Address())
+		s.Contains(capturedURL, "https://l0-lb-mainnet.constellationnetwork.io/dag/"+w.Address()+"/balance")
 	})
 
-	s.Run("creates client for integrationNet", func() {
-		c, err := New(WithIntegrationNet())
+	s.Run("routes balance call to integrationNet L0", func() {
+		w, err := wallet.New()
 		s.Require().NoError(err)
-		s.Equal("https://l0-lb-integrationnet.constellationnetwork.io", c.l0URL)
-		s.Equal("https://l1-lb-integrationnet.constellationnetwork.io", c.l1URL)
+
+		var capturedURL string
+		rt := transportFunc(func(r *http.Request) (*http.Response, error) {
+			capturedURL = r.URL.String()
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"balance":0,"ordinal":0}`)),
+			}, nil
+		})
+		c, err := New(WithIntegrationNet(), WithHTTPClient(&http.Client{Transport: rt}))
+		s.Require().NoError(err)
+
+		_, _ = c.Balance(context.Background(), w.Address())
+		s.Contains(capturedURL, "https://l0-lb-integrationnet.constellationnetwork.io/dag/"+w.Address()+"/balance")
 	})
 
 	s.Run("fails with missing network config", func() {
@@ -44,10 +70,80 @@ func (s *ClientTestSuite) TestNew() {
 	})
 
 	s.Run("uses custom HTTP client when provided", func() {
-		c, err := New(WithIntegrationNet(), WithHTTPClient(&http.Client{Timeout: 1 * time.Second}))
+		w, err := wallet.New()
 		s.Require().NoError(err)
-		s.NotNil(c)
-		s.Equal(1*time.Second, c.httpClient.Timeout)
+
+		called := false
+		rt := transportFunc(func(_ *http.Request) (*http.Response, error) {
+			called = true
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"balance":0,"ordinal":0}`)),
+			}, nil
+		})
+		c, err := New(WithIntegrationNet(), WithHTTPClient(&http.Client{Transport: rt}))
+		s.Require().NoError(err)
+
+		_, _ = c.Balance(context.Background(), w.Address())
+		s.True(called)
+	})
+}
+
+func (s *ClientTestSuite) TestNewMetagraphClient() {
+	s.Run("routes balance call to metagraph L0 with currency path", func() {
+		w, err := wallet.New()
+		s.Require().NoError(err)
+
+		var capturedURL string
+		rt := transportFunc(func(r *http.Request) (*http.Response, error) {
+			capturedURL = r.URL.String()
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"balance":0,"ordinal":0}`)),
+			}, nil
+		})
+		c, err := NewMetagraphClient(
+			"http://test-l0",
+			"http://test-l1",
+			WithHTTPClient(&http.Client{Transport: rt}),
+		)
+		s.Require().NoError(err)
+
+		_, _ = c.Balance(context.Background(), w.Address())
+		s.Contains(capturedURL, "http://test-l0/currency/"+w.Address()+"/balance")
+	})
+
+	s.Run("fails when l0URL is empty", func() {
+		_, err := NewMetagraphClient("", "http://test-l1")
+		s.ErrorIs(err, ErrMissingNetworkConfiguration)
+	})
+
+	s.Run("fails when l1URL is empty", func() {
+		_, err := NewMetagraphClient("http://test-l0", "")
+		s.ErrorIs(err, ErrMissingNetworkConfiguration)
+	})
+
+	s.Run("uses custom HTTP client when provided", func() {
+		w, err := wallet.New()
+		s.Require().NoError(err)
+
+		called := false
+		rt := transportFunc(func(_ *http.Request) (*http.Response, error) {
+			called = true
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"balance":0,"ordinal":0}`)),
+			}, nil
+		})
+		c, err := NewMetagraphClient(
+			"http://test-l0",
+			"http://test-l1",
+			WithHTTPClient(&http.Client{Transport: rt}),
+		)
+		s.Require().NoError(err)
+
+		_, _ = c.Balance(context.Background(), w.Address())
+		s.True(called)
 	})
 }
 
@@ -59,7 +155,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
 
 		var out struct {
 			Result string `json:"result"`
@@ -71,7 +167,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 	})
 
 	s.Run("errors on transport failure", func() {
-		c := &Client{httpClient: &http.Client{Timeout: 1 * time.Millisecond}, l0URL: "http://invalid-url", l1URL: "http://invalid-url"}
+		c := &client{httpClient: &http.Client{Timeout: 1 * time.Millisecond}, l0URL: "http://invalid-url", l1URL: "http://invalid-url"}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", "http://invalid-url", http.MethodPost, nil, &out)
@@ -87,7 +183,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
@@ -102,7 +198,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
@@ -119,7 +215,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
@@ -131,7 +227,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 	})
 
 	s.Run("errors when body can't be marshaled", func() {
-		c := &Client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
+		c := &client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", "http://x", http.MethodPost, make(chan int), &out)
@@ -141,7 +237,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 	})
 
 	s.Run("errors on invalid HTTP method", func() {
-		c := &Client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
+		c := &client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", "http://test-url", "BAD METHOD", nil, &out)
@@ -156,7 +252,7 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
 
 		var out struct{}
 		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
@@ -170,13 +266,13 @@ func (s *ClientTestSuite) TestDoJSON() {
 
 func (s *ClientTestSuite) TestBalance() {
 	s.Run("decodes balance from L0", func() {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			s.Equal("/dag/DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy/balance", r.URL.Path)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(`{"balance": 12345, "ordinal": 5}`))
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
 		bal, err := c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.Require().NoError(err)
@@ -189,17 +285,34 @@ func (s *ClientTestSuite) TestBalance() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
-		_, err := c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
+		_, err = c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.ErrorIs(err, ErrNotFound)
 	})
 
 	s.Run("rejects empty address without making HTTP call", func() {
-		c := &Client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
+		c, err := NewMetagraphClient("http://test-url", "http://test-url")
+		s.Require().NoError(err)
 
-		_, err := c.Balance(context.Background(), "")
+		_, err = c.Balance(context.Background(), "")
 		s.ErrorIs(err, ErrInvalidAddress)
+	})
+
+	s.Run("hits /currency/{addr}/balance in metagraph mode", func() {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			s.Equal("/currency/DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy/balance", r.URL.Path)
+			_, _ = w.Write([]byte(`{"balance": 999, "ordinal": 1}`))
+		}))
+		defer srv.Close()
+
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
+
+		bal, err := c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
+		s.Require().NoError(err)
+		s.Equal(tx.Datoshi(999), bal)
 	})
 }
 
@@ -211,7 +324,8 @@ func (s *ClientTestSuite) TestLastTxRef() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
 		ref, err := c.LastTxRef(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.Require().NoError(err)
@@ -224,7 +338,8 @@ func (s *ClientTestSuite) TestLastTxRef() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
 		ref, err := c.LastTxRef(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.Require().NoError(err)
@@ -233,9 +348,10 @@ func (s *ClientTestSuite) TestLastTxRef() {
 	})
 
 	s.Run("rejects empty address without making HTTP call", func() {
-		c := &Client{httpClient: http.DefaultClient, l1URL: "http://test-url"}
+		c, err := NewMetagraphClient("http://test-url", "http://test-url")
+		s.Require().NoError(err)
 
-		_, err := c.LastTxRef(context.Background(), "")
+		_, err = c.LastTxRef(context.Background(), "")
 		s.ErrorIs(err, ErrInvalidAddress)
 	})
 
@@ -245,9 +361,10 @@ func (s *ClientTestSuite) TestLastTxRef() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
-		_, err := c.LastTxRef(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
+		_, err = c.LastTxRef(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.ErrorIs(err, ErrNotFound)
 	})
 }
@@ -280,7 +397,8 @@ func (s *ClientTestSuite) TestSend() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
 		hash, err := c.Send(context.Background(), signed)
 		s.Require().NoError(err)
@@ -293,9 +411,10 @@ func (s *ClientTestSuite) TestSend() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
-		_, err := c.Send(context.Background(), signed)
+		_, err = c.Send(context.Background(), signed)
 		s.ErrorIs(err, ErrTxRejected)
 	})
 }
@@ -308,7 +427,8 @@ func (s *ClientTestSuite) TestPendingTx() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
 		ref, err := c.PendingTx(context.Background(), "abc123")
 		s.Require().NoError(err)
@@ -321,9 +441,18 @@ func (s *ClientTestSuite) TestPendingTx() {
 		}))
 		defer srv.Close()
 
-		c := &Client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL}
+		c, err := NewMetagraphClient(srv.URL, srv.URL, WithHTTPClient(srv.Client()))
+		s.Require().NoError(err)
 
-		_, err := c.PendingTx(context.Background(), "abc123")
+		_, err = c.PendingTx(context.Background(), "abc123")
 		s.ErrorIs(err, ErrNotFound)
 	})
+}
+
+// transportFunc adapts a function to the http.RoundTripper interface so tests
+// can capture outgoing requests without needing a full httptest server.
+type transportFunc func(*http.Request) (*http.Response, error)
+
+func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
 }
