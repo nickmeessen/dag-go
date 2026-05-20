@@ -89,8 +89,8 @@ func (s *WalletTestSuite) TestSign() {
 		transfer := tx.Transfer{
 			Source:      w.Address(),
 			Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
-			Amount:      tx.Datoshi(100000),
-			Fee:         tx.Datoshi(10000),
+			Amount:      tx.Datum(100000),
+			Fee:         tx.Datum(10000),
 			Parent: tx.Ref{
 				Hash:    "0000000000000000000000000000000000000000000000000000000000000000",
 				Ordinal: 0,
@@ -120,14 +120,44 @@ func (s *WalletTestSuite) TestSign() {
 		transfer := tx.Transfer{
 			Source:      w.Address(),
 			Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
-			Amount:      tx.Datoshi(100000),
-			Fee:         tx.Datoshi(10000),
+			Amount:      tx.Datum(100000),
+			Fee:         tx.Datum(10000),
 			Parent:      tx.Ref{Hash: "0000000000000000000000000000000000000000000000000000000000000000", Ordinal: 0},
 		}
 
 		signed, err := w.Sign(transfer)
 		s.Require().NoError(err)
 		s.NotZero(signed.Value.Salt, "Sign should populate zero-salt transfers")
+	})
+
+	s.Run("rejects negative amount", func() {
+		w, err := FromPrivateKey("9bfe101efc5458ce1dfb8d56c91ad38effb6974d371b6ad206e484e49ed7013c")
+		s.Require().NoError(err)
+
+		_, err = w.Sign(tx.Transfer{
+			Source:      w.Address(),
+			Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
+			Amount:      tx.Amount(-1),
+			Fee:         tx.Datum(10000),
+			Parent:      tx.Ref{Hash: "0000000000000000000000000000000000000000000000000000000000000000", Ordinal: 0},
+			Salt:        8725724278030335,
+		})
+		s.ErrorIs(err, tx.ErrInvalidAmount)
+	})
+
+	s.Run("rejects negative fee", func() {
+		w, err := FromPrivateKey("9bfe101efc5458ce1dfb8d56c91ad38effb6974d371b6ad206e484e49ed7013c")
+		s.Require().NoError(err)
+
+		_, err = w.Sign(tx.Transfer{
+			Source:      w.Address(),
+			Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
+			Amount:      tx.Datum(100000),
+			Fee:         tx.Amount(-1),
+			Parent:      tx.Ref{Hash: "0000000000000000000000000000000000000000000000000000000000000000", Ordinal: 0},
+			Salt:        8725724278030335,
+		})
+		s.ErrorIs(err, tx.ErrInvalidAmount)
 	})
 }
 

@@ -23,8 +23,8 @@ func TestEncodingTestSuite(t *testing.T) {
 var referenceTransfer = Transfer{
 	Source:      "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy",
 	Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
-	Amount:      Datoshi(100000),
-	Fee:         Datoshi(10000),
+	Amount:      Datum(100000),
+	Fee:         Datum(10000),
 	Parent: Ref{
 		Hash:    "0000000000000000000000000000000000000000000000000000000000000000",
 		Ordinal: 0,

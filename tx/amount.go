@@ -1,40 +1,70 @@
 package tx
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"strconv"
+)
 
-// Amount represents a quantity of DAG denominated in datoshi (1 DAG = 10^8
-// datoshi). It is the canonical on-wire unit — all balances, transfers, and
-// fees in dag-go are expressed as Amount. The underlying int64 comfortably
-// holds every valid on-chain value (max DAG supply ~5×10^17 datoshi vs int64
-// max ~9.2×10^18).
+// Amount is a token quantity in datum (the smallest indivisible unit).
+// For DAG, 1 DAG = 10^8 datum; other tokens may use different decimals.
 type Amount int64
 
-// DAG constructs an Amount from a whole-DAG value. The fractional part is
-// truncated at datoshi precision (10^-8 DAG); float rounding at this scale
-// is acceptable for user-facing input. Callers needing exact values should
-// use Datoshi.
-func DAG(dag float64) Amount {
-	return Amount(dag * 1e8)
+// MaxDecimals is the largest decimals value Token can multiply without
+// overflowing int64.
+const MaxDecimals = 18
+
+// Token constructs an Amount from a human value at the given decimals,
+// rounding to the nearest base unit. For exact construction, or for values
+// where value*10^decimals exceeds 2^53, use Datum.
+func Token(decimals int, value float64) Amount {
+	multiplier := int64(1)
+	for range decimals {
+		multiplier *= 10
+	}
+	return Amount(math.Round(value * float64(multiplier)))
 }
 
-// Datoshi constructs an Amount directly from raw datoshi. Use when precision
-// matters — for example, forwarding a balance straight into a transfer.
-func Datoshi(n int64) Amount {
+// Datum constructs an Amount from raw base units. Negative values are
+// accepted; use Validate if non-negativity matters.
+func Datum(n int64) Amount {
 	return Amount(n)
 }
 
-// Int64 returns the Amount as raw datoshi.
+// Validate returns ErrInvalidAmount if a is negative.
+func (a Amount) Validate() error {
+	if a < 0 {
+		return ErrInvalidAmount
+	}
+	return nil
+}
+
+// Int64 returns the raw datum value.
 func (a Amount) Int64() int64 {
 	return int64(a)
 }
 
-// DAG returns the Amount as a whole-DAG floating-point value. Suitable for
-// display; not suitable for arithmetic.
-func (a Amount) DAG() float64 {
-	return float64(a) / 1e8
+// String returns the raw datum value as a decimal string. Use FormatToken
+// for human-readable output at known decimal precision.
+func (a Amount) String() string {
+	return strconv.FormatInt(int64(a), 10)
 }
 
-// String formats the Amount as "N.NNNNNNNN DAG" with full datoshi precision.
-func (a Amount) String() string {
-	return fmt.Sprintf("%.8f DAG", a.DAG())
+// FormatToken returns the Amount as a decimal string at the given precision,
+// e.g. Amount(100000).FormatToken(8) returns "0.00100000".
+func (a Amount) FormatToken(decimals int) string {
+	if decimals == 0 {
+		return strconv.FormatInt(int64(a), 10)
+	}
+	divisor := int64(1)
+	for range decimals {
+		divisor *= 10
+	}
+	n := int64(a)
+	sign := ""
+	if n < 0 {
+		sign = "-"
+		n = -n
+	}
+	return fmt.Sprintf("%s%d.%0*d", sign, n/divisor, decimals, n%divisor)
 }

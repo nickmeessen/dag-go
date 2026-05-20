@@ -153,7 +153,7 @@ func (c *client) Balance(ctx context.Context, address string) (tx.Amount, error)
 	if err := c.doJSON(ctx, "balance", url, http.MethodGet, nil, &r); err != nil {
 		return 0, err
 	}
-	return tx.Datoshi(r.Balance), nil
+	return tx.Datum(r.Balance), nil
 }
 
 // LastTxRef returns the most recent accepted transaction reference for the

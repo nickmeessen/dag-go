@@ -136,6 +136,9 @@ func (w *Wallet) publicKeyBytes() []byte {
 // hex-encoded into the proof. The double-hash with an intermediate hex
 // conversion is protocol-mandated; don't "simplify" it to a single hash.
 func (w *Wallet) Sign(t tx.Transfer) (tx.Signed, error) {
+	if t.Amount < 0 || t.Fee < 0 {
+		return tx.Signed{}, fmt.Errorf("sign: %w", tx.ErrInvalidAmount)
+	}
 	if t.Salt == 0 {
 		salt, err := tx.GenerateSalt()
 		if err != nil {

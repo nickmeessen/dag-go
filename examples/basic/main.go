@@ -22,7 +22,7 @@ func main() {
 	client, _ := network.New(network.WithIntegrationNet())
 
 	bal, _ := client.Balance(ctx, sender.Address())
-	fmt.Printf("sender balance: %s\n", bal)
+	fmt.Printf("sender balance: %s DAG\n", bal.FormatToken(8))
 	fmt.Printf("recipient address: %s\n", recipient.Address())
 
 	ref, _ := client.LastTxRef(ctx, sender.Address())
@@ -30,9 +30,9 @@ func main() {
 	testTx := tx.Transfer{
 		Source:      sender.Address(),
 		Destination: recipient.Address(),
-		Amount:      tx.DAG(0.001),
+		Amount:      tx.Token(8, 0.001),
 		Parent:      ref,
-		Fee:         tx.DAG(0.0001),
+		Fee:         tx.Token(8, 0.0001),
 	}
 
 	signedTx, _ := sender.Sign(testTx)

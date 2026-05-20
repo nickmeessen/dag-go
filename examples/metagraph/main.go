@@ -17,6 +17,7 @@ import (
 // metagraph's L0 and L1 endpoints.
 func main() {
 	ctx := context.Background()
+	const decimals = 8
 
 	sender, _ := wallet.FromPrivateKey(os.Getenv("PRIVATE_KEY"))
 	recipient, _ := wallet.New()
@@ -24,7 +25,7 @@ func main() {
 	client, _ := network.NewMetagraphClient(os.Getenv("MG_L0_URL"), os.Getenv("MG_L1_URL"))
 
 	bal, _ := client.Balance(ctx, sender.Address())
-	fmt.Printf("sender balance: %s\n", bal)
+	fmt.Printf("sender balance: %s\n", bal.FormatToken(decimals))
 	fmt.Printf("recipient address: %s\n", recipient.Address())
 
 	ref, _ := client.LastTxRef(ctx, sender.Address())
@@ -32,9 +33,9 @@ func main() {
 	testTx := tx.Transfer{
 		Source:      sender.Address(),
 		Destination: recipient.Address(),
-		Amount:      tx.DAG(0.001),
+		Amount:      tx.Token(decimals, 0.001),
 		Parent:      ref,
-		Fee:         tx.DAG(0.0001),
+		Fee:         tx.Token(decimals, 0.0001),
 	}
 
 	signedTx, _ := sender.Sign(testTx)
