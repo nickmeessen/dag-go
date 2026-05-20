@@ -31,7 +31,7 @@ type Wallet struct {
 	privateKey *secp256k1.PrivateKey
 }
 
-// New generates a wallet backed by a fresh cryptographically secure secp256k1 private key.
+// New generates a wallet from a fresh secp256k1 private key.
 func New() (*Wallet, error) {
 	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
@@ -62,9 +62,8 @@ func FromPrivateKey(privateKey string) (*Wallet, error) {
 }
 
 // FromMnemonic restores a Wallet from a BIP39 mnemonic phrase using the
-// Constellation HD derivation path m/44'/1137'/0'/0/0.
-// Returns ErrInvalidMnemonic if the phrase fails BIP39 validation (word count,
-// unknown word, or checksum mismatch).
+// Constellation HD derivation path m/44'/1137'/0'/0/0. Returns
+// ErrInvalidMnemonic on BIP39 validation failure.
 func FromMnemonic(phrase string) (*Wallet, error) {
 	if !bip39.IsMnemonicValid(phrase) {
 		return nil, ErrInvalidMnemonic
