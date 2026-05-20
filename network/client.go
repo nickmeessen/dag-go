@@ -16,7 +16,7 @@ import (
 	"github.com/nickmeessen/dag-go/tx"
 )
 
-// Client represents a DAG network client, used to interact with both metagraphs and the global network.
+// Client interacts with either the global DAG network or a metagraph.
 type Client interface {
 	// Balance retrieves the current balance for the given address from L0.
 	Balance(ctx context.Context, address string) (tx.Amount, error)
@@ -136,10 +136,9 @@ func (c *client) doJSON(ctx context.Context, op, url, method string, body, out a
 	return nil
 }
 
-// Balance returns the balance of the given DAG address on the configured
-// network or metagraph. Returns ErrInvalidAddress for empty input, ErrNotFound if the
-// address has no on-chain history, and ErrNodeUnreachable on transport-level
-// failures.
+// Balance returns the balance for the given address on the configured
+// network or metagraph. Returns ErrInvalidAddress for empty input,
+// ErrNotFound if the address has no on-chain history.
 func (c *client) Balance(ctx context.Context, address string) (tx.Amount, error) {
 	if address == "" {
 		return 0, ErrInvalidAddress
@@ -153,7 +152,7 @@ func (c *client) Balance(ctx context.Context, address string) (tx.Amount, error)
 	if err := c.doJSON(ctx, "balance", url, http.MethodGet, nil, &r); err != nil {
 		return 0, err
 	}
-	return tx.Datoshi(r.Balance), nil
+	return tx.Datum(r.Balance), nil
 }
 
 // LastTxRef returns the most recent accepted transaction reference for the

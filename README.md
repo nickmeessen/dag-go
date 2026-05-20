@@ -25,14 +25,14 @@ ref, _ := client.LastTxRef(ctx, sender.Address())
 t := tx.Transfer{
     Source:      sender.Address(),
     Destination: recipient.Address(),
-    Amount:      tx.DAG(0.001),
-    Fee:         tx.DAG(0.0001),
+    Amount:      tx.Token(8, 0.001),
+    Fee:         tx.Token(8, 0.0001),
     Parent:      ref,
 }
 
 signed, _ := sender.Sign(t)
 hash, _ := client.Send(ctx, signed)
-fmt.Printf("submitted: %s (balance was %s)\n", hash, bal)
+fmt.Printf("submitted: %s (balance was %s DAG)\n", hash, bal.FormatToken(8))
 ```
 
 See [`examples/basic`](examples/basic/main.go) for the full demo including pending-tx polling.

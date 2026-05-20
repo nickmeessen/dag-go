@@ -276,7 +276,7 @@ func (s *ClientTestSuite) TestBalance() {
 
 		bal, err := c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.Require().NoError(err)
-		s.Equal(tx.Datoshi(12345), bal)
+		s.Equal(tx.Datum(12345), bal)
 	})
 
 	s.Run("propagates ErrNotFound on 404", func() {
@@ -312,7 +312,7 @@ func (s *ClientTestSuite) TestBalance() {
 
 		bal, err := c.Balance(context.Background(), "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy")
 		s.Require().NoError(err)
-		s.Equal(tx.Datoshi(999), bal)
+		s.Equal(tx.Datum(999), bal)
 	})
 }
 
@@ -374,8 +374,8 @@ func (s *ClientTestSuite) TestSend() {
 		Value: tx.Transfer{
 			Source:      "DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy",
 			Destination: "DAG1ATvdAxGz4DNzPdrk6p8QD1CdSXNLvYypaaVQ",
-			Amount:      tx.Datoshi(100000),
-			Fee:         tx.Datoshi(10000),
+			Amount:      tx.Datum(100000),
+			Fee:         tx.Datum(10000),
 			Parent:      tx.Ref{Hash: "0000000000000000000000000000000000000000000000000000000000000000", Ordinal: 0},
 			Salt:        8725724278030335,
 		},
