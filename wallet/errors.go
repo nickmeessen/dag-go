@@ -9,4 +9,7 @@ var (
 	// ErrInvalidMnemonic is returned when a supplied BIP39 phrase is malformed —
 	// wrong word count, unknown words, or a checksum mismatch.
 	ErrInvalidMnemonic = errors.New("invalid mnemonic")
+	// ErrInvalidAddress is returned by ValidateAddress when a DAG address
+	// fails format validation.
+	ErrInvalidAddress = errors.New("invalid address")
 )

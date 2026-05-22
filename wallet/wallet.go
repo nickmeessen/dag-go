@@ -86,6 +86,26 @@ func FromMnemonic(phrase string) (*Wallet, error) {
 	return FromPrivateKey(hex.EncodeToString(key.Key))
 }
 
+// ValidateAddress returns ErrInvalidAddress if address isn't a syntactically
+// valid DAG address ("DAG" + parity digit + 36 base58 chars).
+func ValidateAddress(address string) error {
+	if len(address) != 40 || address[:3] != "DAG" {
+		return ErrInvalidAddress
+	}
+	parityChar := address[3]
+	if parityChar < '0' || parityChar > '9' {
+		return ErrInvalidAddress
+	}
+	last36 := address[4:]
+	if _, err := base58.Decode(last36); err != nil {
+		return ErrInvalidAddress
+	}
+	if int(parityChar-'0') != computeParityDigit(last36) {
+		return ErrInvalidAddress
+	}
+	return nil
+}
+
 // PrivateKeyHex returns the 32-byte private key as 64 hex characters.
 // Treat the returned value as secret, leaking it lets anyone sign for this wallet.
 func (w *Wallet) PrivateKeyHex() string {
@@ -105,15 +125,7 @@ func (w *Wallet) Address() string {
 	encoded := base58.Encode(sum[:])
 	last36 := encoded[len(encoded)-36:]
 
-	parity := 0
-	for i := 0; i < len(last36); i++ {
-		if c := last36[i]; c >= '0' && c <= '9' {
-			parity += int(c - '0')
-		}
-	}
-	parity %= 9
-
-	return fmt.Sprintf("DAG%d%s", parity, last36)
+	return fmt.Sprintf("DAG%d%s", computeParityDigit(last36), last36)
 }
 
 // PeerID returns the uncompressed public key without the 04 prefix as 128 hex characters.
@@ -160,6 +172,16 @@ func (w *Wallet) Sign(t tx.Transfer) (tx.Signed, error) {
 			{ID: w.PeerID(), Signature: hex.EncodeToString(sig.Serialize())},
 		},
 	}, nil
+}
+
+func computeParityDigit(last36 string) int {
+	sum := 0
+	for i := 0; i < len(last36); i++ {
+		if c := last36[i]; c >= '0' && c <= '9' {
+			sum += int(c - '0')
+		}
+	}
+	return sum % 9
 }
 
 // mustHex decodes a hex string and panics if decoding fails.

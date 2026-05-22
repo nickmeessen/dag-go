@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // Amount is a token quantity in datum (the smallest indivisible unit).
@@ -67,4 +68,17 @@ func (a Amount) FormatToken(decimals int) string {
 		n = -n
 	}
 	return fmt.Sprintf("%s%d.%0*d", sign, n/divisor, decimals, n%divisor)
+}
+
+// FormatTokenCompact returns the Amount as a decimal string at the given
+// precision with trailing zeros and trailing dot trimmed, e.g.
+// Amount(100000).FormatTokenCompact(8) returns "0.001".
+func (a Amount) FormatTokenCompact(decimals int) string {
+	s := a.FormatToken(decimals)
+	if decimals == 0 {
+		return s
+	}
+	s = strings.TrimRight(s, "0")
+	s = strings.TrimRight(s, ".")
+	return s
 }

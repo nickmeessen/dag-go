@@ -92,3 +92,35 @@ func (s *AmountTestSuite) TestFormatToken() {
 		s.Equal("-0.00000001", Datum(-1).FormatToken(8))
 	})
 }
+
+func (s *AmountTestSuite) TestFormatTokenCompact() {
+	s.Run("trims trailing zeros", func() {
+		s.Equal("1.5", Token(8, 1.5).FormatTokenCompact(8))
+		s.Equal("0.001", Token(8, 0.001).FormatTokenCompact(8))
+	})
+
+	s.Run("trims trailing dot on whole numbers", func() {
+		s.Equal("1", Token(8, 1.0).FormatTokenCompact(8))
+		s.Equal("100", Token(8, 100.0).FormatTokenCompact(8))
+	})
+
+	s.Run("returns 0 for zero amount", func() {
+		s.Equal("0", Datum(0).FormatTokenCompact(8))
+	})
+
+	s.Run("preserves sub-unit precision", func() {
+		s.Equal("0.00000001", Datum(1).FormatTokenCompact(8))
+		s.Equal("0.0000001", Datum(10).FormatTokenCompact(8))
+		s.Equal("0.000001", Datum(100).FormatTokenCompact(8))
+	})
+
+	s.Run("handles negative amounts", func() {
+		s.Equal("-1.5", Token(8, -1.5).FormatTokenCompact(8))
+		s.Equal("-0.00000001", Datum(-1).FormatTokenCompact(8))
+	})
+
+	s.Run("passes through when decimals is zero", func() {
+		s.Equal("42", Datum(42).FormatTokenCompact(0))
+		s.Equal("0", Datum(0).FormatTokenCompact(0))
+	})
+}

@@ -262,6 +262,39 @@ func (s *ClientTestSuite) TestDoJSON() {
 		s.False(errors.Is(err, ErrNotFound))
 		s.Contains(err.Error(), "500")
 	})
+
+	s.Run("includes response body in 4xx error", func() {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"insufficient balance"}`))
+		}))
+		defer srv.Close()
+
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
+
+		var out struct{}
+		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+
+		s.Require().Error(err)
+		s.ErrorIs(err, ErrTxRejected)
+		s.Contains(err.Error(), `{"error":"insufficient balance"}`)
+	})
+
+	s.Run("includes response body in 5xx error", func() {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("upstream connection refused"))
+		}))
+		defer srv.Close()
+
+		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
+
+		var out struct{}
+		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+
+		s.Require().Error(err)
+		s.Contains(err.Error(), "upstream connection refused")
+	})
 }
 
 func (s *ClientTestSuite) TestBalance() {
