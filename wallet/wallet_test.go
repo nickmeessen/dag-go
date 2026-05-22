@@ -161,6 +161,44 @@ func (s *WalletTestSuite) TestSign() {
 	})
 }
 
+func (s *WalletTestSuite) TestValidateAddress() {
+	s.Run("accepts valid known addresses", func() {
+		s.NoError(ValidateAddress("DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy"))
+		s.NoError(ValidateAddress("DAG58AYZbPHyiYQcmD96T3zWK2HyN3Zc3cjWGqi7"))
+	})
+
+	s.Run("accepts a fresh wallet's address", func() {
+		w, err := New()
+		s.Require().NoError(err)
+		s.NoError(ValidateAddress(w.Address()))
+	})
+
+	s.Run("rejects empty input", func() {
+		s.ErrorIs(ValidateAddress(""), ErrInvalidAddress)
+	})
+
+	s.Run("rejects wrong length", func() {
+		s.ErrorIs(ValidateAddress("DAG3jif"), ErrInvalidAddress)
+		s.ErrorIs(ValidateAddress("DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsyEXTRA"), ErrInvalidAddress)
+	})
+
+	s.Run("rejects wrong prefix", func() {
+		s.ErrorIs(ValidateAddress("ETH3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy"), ErrInvalidAddress)
+	})
+
+	s.Run("rejects non-digit parity char", func() {
+		s.ErrorIs(ValidateAddress("DAGXjifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy"), ErrInvalidAddress)
+	})
+
+	s.Run("rejects bad base58 chars", func() {
+		s.ErrorIs(ValidateAddress("DAG3jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8ts0"), ErrInvalidAddress)
+	})
+
+	s.Run("rejects mismatched parity digit", func() {
+		s.ErrorIs(ValidateAddress("DAG4jifKUZPc213rRLSfZVSLZfPRfX7fwTGh8tsy"), ErrInvalidAddress)
+	})
+}
+
 func (s *WalletTestSuite) TestPrivateKeyHex() {
 	w, err := FromPrivateKey("9bfe101efc5458ce1dfb8d56c91ad38effb6974d371b6ad206e484e49ed7013c")
 	s.Require().NoError(err)

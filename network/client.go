@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nickmeessen/dag-go/tx"
@@ -124,16 +125,25 @@ func (c *client) doJSON(ctx context.Context, op, url, method string, body, out a
 		return ErrNotFound
 	}
 	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-		return fmt.Errorf("%w: %s returned %d", ErrTxRejected, op, resp.StatusCode)
+		return fmt.Errorf("%w: %s returned %d%s", ErrTxRejected, op, resp.StatusCode, readErrorBody(resp.Body))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: unexpected status %d", op, resp.StatusCode)
+		return fmt.Errorf("%s: unexpected status %d%s", op, resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		return fmt.Errorf("%s: decode response: %w", op, err)
 	}
 	return nil
+}
+
+func readErrorBody(body io.Reader) string {
+	raw, _ := io.ReadAll(io.LimitReader(body, 4096))
+	msg := strings.TrimSpace(string(raw))
+	if msg == "" {
+		return ""
+	}
+	return ": " + msg
 }
 
 // Balance returns the balance for the given address on the configured
