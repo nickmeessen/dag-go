@@ -1,18 +1,12 @@
-// Package network provides an HTTP client for the Constellation (DAG)
-// network. It has clients for both metagraphs and the global network.
-// It exposes balance and last-tx-reference queries against L0,
-// plus transaction submission and pending-tx polling against L1.
+// Package network provides HTTP clients for the Constellation network.
+// Client handles balance, last-tx-ref, send, and pending-tx against L0/L1 for
+// either DAG or a metagraph. BlockExplorer reads confirmed state (transactions,
+// balances, locks, allow-spends) from the Block Explorer.
 package network
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/nickmeessen/dag-go/tx"
 )
@@ -36,23 +30,18 @@ type client struct {
 	balancePath string
 }
 
-// Option is a function that configures a Client.
-type Option func(*client)
-
 // New creates a new Client with the given options.
 func New(options ...Option) (Client, error) {
-	c := &client{}
-	for _, option := range options {
-		option(c)
-	}
-	if c.httpClient == nil {
-		c.httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
-	if c.l0URL == "" || c.l1URL == "" {
+	cfg := newConfig(options...)
+	if cfg.l0URL == "" || cfg.l1URL == "" {
 		return nil, ErrMissingNetworkConfiguration
 	}
-	c.balancePath = "/dag/"
-	return c, nil
+	return &client{
+		httpClient:  cfg.httpClient,
+		l0URL:       cfg.l0URL,
+		l1URL:       cfg.l1URL,
+		balancePath: "/dag/",
+	}, nil
 }
 
 // NewMetagraphClient creates a new Client for the configured Metagraph network.
@@ -60,90 +49,13 @@ func NewMetagraphClient(l0URL, l1URL string, options ...Option) (Client, error) 
 	if l0URL == "" || l1URL == "" {
 		return nil, ErrMissingNetworkConfiguration
 	}
-	c := &client{}
-	for _, option := range options {
-		option(c)
-	}
-	if c.httpClient == nil {
-		c.httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
-	c.l0URL = l0URL
-	c.l1URL = l1URL
-	c.balancePath = "/currency/"
-	return c, nil
-}
-
-// WithHTTPClient sets the HTTP client to use for requests.
-func WithHTTPClient(c *http.Client) Option {
-	return func(n *client) {
-		n.httpClient = c
-	}
-}
-
-// WithMainNet configures the client to hit Constellation's production mainnet
-// endpoints. DAG transferred here is real value, so use with care.
-func WithMainNet() Option {
-	return func(n *client) {
-		n.l0URL = "https://l0-lb-mainnet.constellationnetwork.io"
-		n.l1URL = "https://l1-lb-mainnet.constellationnetwork.io"
-	}
-}
-
-// WithIntegrationNet configures the client to hit Constellation's IntegrationNet,
-// the pre-production environment for testing. Tokens here have no real value
-// and can be obtained from the faucet at
-// https://faucet.constellationnetwork.io/integrationnet/faucet/<DAG_ADDRESS>.
-func WithIntegrationNet() Option {
-	return func(n *client) {
-		n.l0URL = "https://l0-lb-integrationnet.constellationnetwork.io"
-		n.l1URL = "https://l1-lb-integrationnet.constellationnetwork.io"
-	}
-}
-
-func (c *client) doJSON(ctx context.Context, op, url, method string, body, out any) error {
-	var bodyReader io.Reader
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("%s: marshal request body: %w", op, err)
-		}
-		bodyReader = bytes.NewReader(jsonBody)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-	if err != nil {
-		return fmt.Errorf("%s: build request: %w", op, err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrNodeUnreachable, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrNotFound
-	}
-	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-		return fmt.Errorf("%w: %s returned %d%s", ErrTxRejected, op, resp.StatusCode, readErrorBody(resp.Body))
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: unexpected status %d%s", op, resp.StatusCode, readErrorBody(resp.Body))
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("%s: decode response: %w", op, err)
-	}
-	return nil
-}
-
-func readErrorBody(body io.Reader) string {
-	raw, _ := io.ReadAll(io.LimitReader(body, 4096))
-	msg := strings.TrimSpace(string(raw))
-	if msg == "" {
-		return ""
-	}
-	return ": " + msg
+	cfg := newConfig(options...)
+	return &client{
+		httpClient:  cfg.httpClient,
+		l0URL:       l0URL,
+		l1URL:       l1URL,
+		balancePath: "/currency/",
+	}, nil
 }
 
 // Balance returns the balance for the given address on the configured
@@ -159,7 +71,7 @@ func (c *client) Balance(ctx context.Context, address string) (tx.Amount, error)
 		Ordinal uint64 `json:"ordinal"`
 	}
 	url := c.l0URL + c.balancePath + address + "/balance"
-	if err := c.doJSON(ctx, "balance", url, http.MethodGet, nil, &r); err != nil {
+	if err := doJSON(ctx, c.httpClient, "balance", url, http.MethodGet, nil, &r); err != nil {
 		return 0, err
 	}
 	return tx.Datum(r.Balance), nil
@@ -179,7 +91,7 @@ func (c *client) LastTxRef(ctx context.Context, address string) (tx.Ref, error) 
 		Ordinal uint64 `json:"ordinal"`
 	}
 	url := c.l1URL + "/transactions/last-reference/" + address
-	if err := c.doJSON(ctx, "last-tx-ref", url, http.MethodGet, nil, &r); err != nil {
+	if err := doJSON(ctx, c.httpClient, "last-tx-ref", url, http.MethodGet, nil, &r); err != nil {
 		return tx.Ref{}, err
 	}
 	return tx.Ref{Hash: r.Hash, Ordinal: r.Ordinal}, nil
@@ -194,7 +106,7 @@ func (c *client) Send(ctx context.Context, signed tx.Signed) (string, error) {
 	}
 
 	url := c.l1URL + "/transactions"
-	if err := c.doJSON(ctx, "send", url, http.MethodPost, signed, &r); err != nil {
+	if err := doJSON(ctx, c.httpClient, "send", url, http.MethodPost, signed, &r); err != nil {
 		return "", err
 	}
 	return r.Hash, nil
@@ -210,7 +122,7 @@ func (c *client) PendingTx(ctx context.Context, hash string) (tx.Ref, error) {
 		Ordinal uint64 `json:"ordinal"`
 	}
 	url := c.l1URL + "/transactions/pending/" + hash
-	if err := c.doJSON(ctx, "pending-tx", url, http.MethodGet, nil, &r); err != nil {
+	if err := doJSON(ctx, c.httpClient, "pending-tx", url, http.MethodGet, nil, &r); err != nil {
 		return tx.Ref{}, err
 	}
 	return tx.Ref{Hash: r.Hash, Ordinal: r.Ordinal}, nil
