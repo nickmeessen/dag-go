@@ -124,3 +124,83 @@ func (s *AmountTestSuite) TestFormatTokenCompact() {
 		s.Equal("0", Datum(0).FormatTokenCompact(0))
 	})
 }
+
+func (s *AmountTestSuite) TestParseToken() {
+	s.Run("parses basic decimals at given precision", func() {
+		got, err := ParseToken(8, "1.5")
+		s.Require().NoError(err)
+		s.Equal(Amount(150000000), got)
+
+		got, err = ParseToken(8, "0.00000001")
+		s.Require().NoError(err)
+		s.Equal(Amount(1), got)
+
+		got, err = ParseToken(8, "0")
+		s.Require().NoError(err)
+		s.Equal(Amount(0), got)
+	})
+
+	s.Run("parses whole numbers without decimal point", func() {
+		got, err := ParseToken(8, "42")
+		s.Require().NoError(err)
+		s.Equal(Amount(4200000000), got)
+	})
+
+	s.Run("parses fewer fractional digits than precision", func() {
+		got, err := ParseToken(8, "1.5")
+		s.Require().NoError(err)
+		s.Equal(Amount(150000000), got)
+
+		got, err = ParseToken(3, "1.5")
+		s.Require().NoError(err)
+		s.Equal(Amount(1500), got)
+	})
+
+	s.Run("handles zero decimals", func() {
+		got, err := ParseToken(0, "42")
+		s.Require().NoError(err)
+		s.Equal(Amount(42), got)
+	})
+
+	s.Run("rejects excess precision", func() {
+		_, err := ParseToken(8, "1.123456789")
+		s.ErrorIs(err, ErrInvalidAmount)
+	})
+
+	s.Run("rejects negative values", func() {
+		_, err := ParseToken(8, "-1")
+		s.ErrorIs(err, ErrInvalidAmount)
+
+		_, err = ParseToken(8, "-1.5")
+		s.ErrorIs(err, ErrInvalidAmount)
+	})
+
+	s.Run("rejects malformed input", func() {
+		for _, in := range []string{"", "abc", "1.2.3", "1.", ".5", "1..0"} {
+			_, err := ParseToken(8, in)
+			s.ErrorIs(err, ErrInvalidAmount, "input %q", in)
+		}
+	})
+
+	s.Run("rejects non-strict numeric forms", func() {
+		for _, in := range []string{"+1.5", " 1.5", "1.5 ", "1e2", "3/4", "0x1"} {
+			_, err := ParseToken(8, in)
+			s.ErrorIs(err, ErrInvalidAmount, "input %q", in)
+		}
+	})
+
+	s.Run("rejects int64 overflow", func() {
+		// 10^18 fits in int64 (max ~9.22e18) but 10^19 does not.
+		_, err := ParseToken(0, "99999999999999999999")
+		s.ErrorIs(err, ErrInvalidAmount)
+	})
+
+	s.Run("round-trips against FormatToken", func() {
+		for _, n := range []Amount{0, 1, 100000, 150000000, 9_223_372_036_854_775_807} {
+			formatted := n.FormatToken(8)
+			got, err := ParseToken(8, formatted)
+			s.Require().NoError(err, "input %q", formatted)
+			s.Equal(n, got, "input %q", formatted)
+		}
+	})
+}
