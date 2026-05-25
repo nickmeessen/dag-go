@@ -3,6 +3,7 @@ package tx
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -24,6 +25,28 @@ func Token(decimals int, value float64) Amount {
 		multiplier *= 10
 	}
 	return Amount(math.Round(value * float64(multiplier)))
+}
+
+var parseTokenRe = regexp.MustCompile(`^\d+(\.\d+)?$`)
+
+// ParseToken parses a decimal string into an Amount at the given precision.
+// Inverse of FormatToken; returns ErrInvalidAmount on bad input.
+func ParseToken(decimals int, s string) (Amount, error) {
+	if !parseTokenRe.MatchString(s) {
+		return 0, fmt.Errorf("parse %q: %w", s, ErrInvalidAmount)
+	}
+
+	intPart, fracPart, _ := strings.Cut(s, ".")
+	if len(fracPart) > decimals {
+		return 0, fmt.Errorf("parse %q: %w", s, ErrInvalidAmount)
+	}
+	fracPart += strings.Repeat("0", decimals-len(fracPart))
+
+	n, err := strconv.ParseInt(intPart+fracPart, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse %q: %w", s, ErrInvalidAmount)
+	}
+	return Amount(n), nil
 }
 
 // Datum constructs an Amount from raw base units. Negative values are
