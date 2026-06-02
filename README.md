@@ -39,6 +39,20 @@ See [`examples/basic`](examples/basic/main.go) for the full demo including pendi
 
 For metagraph token transfers, use `network.NewMetagraphClient` with the metagraph's L0/L1 URLs, see [`examples/metagraph`](examples/metagraph/main.go).
 
+### Reading confirmed state
+
+```go
+be, _ := network.NewBlockExplorer(network.WithMainNet())
+
+bal, _ := be.AddressBalance(ctx, addr)
+fmt.Printf("balance: %s (at ordinal %d)\n", bal.Balance.FormatToken(8), bal.Ordinal)
+
+txs, _, _ := be.TransactionsByAddress(ctx, addr, network.PageOpts{Limit: 10})
+locks, _, _ := be.TokenLocksByAddress(ctx, addr, network.PageOpts{ActiveOnly: true})
+```
+
+For metagraph token reads, swap `NewBlockExplorer` for `NewMetagraphBlockExplorer(metagraphID, ...)`. See [`examples/blockexplorer`](examples/blockexplorer/main.go).
+
 ## Installation
 
 ```bash

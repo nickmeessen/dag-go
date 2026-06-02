@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -18,10 +17,6 @@ import (
 
 type ClientTestSuite struct {
 	suite.Suite
-}
-
-func TestClientTestSuite(t *testing.T) {
-	suite.Run(t, new(ClientTestSuite))
 }
 
 func (s *ClientTestSuite) TestNew() {
@@ -155,22 +150,18 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct {
 			Result string `json:"result"`
 		}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().NoError(err)
 		s.Equal("ok", out.Result)
 	})
 
 	s.Run("errors on transport failure", func() {
-		c := &client{httpClient: &http.Client{Timeout: 1 * time.Millisecond}, l0URL: "http://invalid-url", l1URL: "http://invalid-url"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", "http://invalid-url", http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), &http.Client{Timeout: 1 * time.Millisecond}, "send", "http://invalid-url", http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.False(errors.Is(err, ErrTxRejected))
@@ -183,10 +174,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.False(errors.Is(err, ErrTxRejected))
@@ -198,10 +187,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.True(errors.Is(err, ErrTxRejected))
@@ -215,10 +202,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.True(errors.Is(err, ErrTxRejected))
@@ -227,20 +212,16 @@ func (s *ClientTestSuite) TestDoJSON() {
 	})
 
 	s.Run("errors when body can't be marshaled", func() {
-		c := &client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", "http://x", http.MethodPost, make(chan int), &out)
+		err := doJSON(context.Background(), http.DefaultClient, "send", "http://x", http.MethodPost, make(chan int), &out)
 
 		s.Require().Error(err)
 		s.Contains(err.Error(), "marshal request body")
 	})
 
 	s.Run("errors on invalid HTTP method", func() {
-		c := &client{httpClient: http.DefaultClient, l0URL: "http://test-url", l1URL: ""}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", "http://test-url", "BAD METHOD", nil, &out)
+		err := doJSON(context.Background(), http.DefaultClient, "send", "http://test-url", "BAD METHOD", nil, &out)
 
 		s.Require().Error(err)
 		s.Contains(err.Error(), "build request")
@@ -252,10 +233,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.False(errors.Is(err, ErrTxRejected))
@@ -270,10 +249,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.ErrorIs(err, ErrTxRejected)
@@ -287,10 +264,8 @@ func (s *ClientTestSuite) TestDoJSON() {
 		}))
 		defer srv.Close()
 
-		c := &client{httpClient: srv.Client(), l0URL: srv.URL, l1URL: srv.URL, balancePath: "/dag/"}
-
 		var out struct{}
-		err := c.doJSON(context.Background(), "send", srv.URL, http.MethodPost, nil, &out)
+		err := doJSON(context.Background(), srv.Client(), "send", srv.URL, http.MethodPost, nil, &out)
 
 		s.Require().Error(err)
 		s.Contains(err.Error(), "upstream connection refused")
@@ -480,12 +455,4 @@ func (s *ClientTestSuite) TestPendingTx() {
 		_, err = c.PendingTx(context.Background(), "abc123")
 		s.ErrorIs(err, ErrNotFound)
 	})
-}
-
-// transportFunc adapts a function to the http.RoundTripper interface so tests
-// can capture outgoing requests without needing a full httptest server.
-type transportFunc func(*http.Request) (*http.Response, error)
-
-func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
-	return f(r)
 }
